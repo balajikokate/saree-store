@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <rect width="800" height="1000" fill="#D9A82B"/>
+  <rect x="30" y="30" width="740" height="940" fill="none" stroke="#C89B3C" stroke-width="3"/>
+  <text x="400" y="480" font-family="Georgia, serif" font-size="36" fill="#FBF6EE" text-anchor="middle">Sunflower Yellow Banarasi</text>
+  <text x="400" y="530" font-family="Georgia, serif" font-size="20" fill="#FBF6EE" text-anchor="middle" opacity="0.7">Sample image 2 — replace with real photo</text>
+</svg>

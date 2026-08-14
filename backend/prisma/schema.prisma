@@ -1,0 +1,90 @@
+// Prisma schema for the saree storefront
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Product {
+  id             String      @id @default(uuid())
+  name           String
+  slug           String      @unique
+  description    String
+  fabric         String // e.g. Kalanjali Paithani, Maheshwari Cotton, Chiffon, Georgette
+  color          String
+  occasion       String // e.g. Wedding, Festive, Casual, Party
+  price          Decimal     @db.Decimal(10, 2) // MRP in INR
+  discountPrice  Decimal?    @db.Decimal(10, 2) // Selling price in INR
+  stock          Int         @default(0)
+  images         String[] // array of image URLs
+  featured       Boolean     @default(false)
+  rating         Decimal     @default(4.5) @db.Decimal(2, 1)
+  category       Category    @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  orderItems     OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([categoryId])
+  @@index([featured])
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  orderNumber       String      @unique // human friendly, e.g. SS-20260813-0001
+  customerName      String
+  email             String
+  phone             String
+  addressLine       String
+  city               String
+  state             String
+  pincode           String
+  subtotal          Decimal     @db.Decimal(10, 2)
+  shippingFee       Decimal     @default(0) @db.Decimal(10, 2)
+  totalAmount       Decimal     @db.Decimal(10, 2)
+  status            OrderStatus @default(PENDING)
+  razorpayOrderId   String?     @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([email])
+  @@index([razorpayOrderId])
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  product     Product @relation(fields: [productId], references: [id])
+  productId   String
+  productName String // snapshot at time of order
+  price       Decimal @db.Decimal(10, 2) // snapshot price at time of order
+  quantity    Int
+
+  @@index([orderId])
+}

@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+  :focus-visible {
+    outline: 2px solid #c89b3c;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Signature motif: a thin ornamental "zari" border strip, evoking the
+     woven gold border of a saree. Used sparingly at key section seams. */
+  .zari-strip {
+    height: 6px;
+    background-image: repeating-linear-gradient(
+      135deg,
+      #c89b3c 0,
+      #c89b3c 3px,
+      transparent 3px,
+      transparent 9px
+    );
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-sm bg-maroon px-6 py-3 font-body text-sm font-semibold tracking-wide text-ivory transition-colors hover:bg-maroon-dark disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-sm border border-maroon px-6 py-3 font-body text-sm font-semibold tracking-wide text-maroon transition-colors hover:bg-maroon hover:text-ivory disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .input-field {
+    @apply w-full rounded-sm border border-ink/15 bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:border-maroon focus:outline-none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
