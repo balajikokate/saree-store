@@ -58,6 +58,47 @@ const orderStatusSchema = z.object({
   status: z.enum(["PENDING", "PAID", "FAILED", "SHIPPED", "DELIVERED", "CANCELLED"]),
 });
 
+const signupSchema = z.object({
+  name: z.string().min(2, "Name is too short").max(100),
+  email: z.string().email("Invalid email"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(72),
+  phone: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number")
+    .optional()
+    .or(z.literal("")),
+});
+
+const customerLoginSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const profileUpdateSchema = z.object({
+  name: z.string().min(2, "Name is too short").max(100).optional(),
+  phone: z
+    .string()
+    .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number")
+    .optional()
+    .or(z.literal("")),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").max(72),
+});
+
+const addressSchema = z.object({
+  label: z.string().min(1).max(30).default("Home"),
+  fullName: z.string().min(2, "Name is too short").max(100),
+  phone: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
+  addressLine: z.string().min(5, "Address is too short").max(250),
+  city: z.string().min(2).max(100),
+  state: z.string().min(2).max(100),
+  pincode: z.string().regex(/^\d{6}$/, "Enter a valid 6-digit pincode"),
+  isDefault: z.boolean().optional(),
+});
+
 module.exports = {
   checkoutSchema,
   verifyPaymentSchema,
@@ -65,4 +106,9 @@ module.exports = {
   adminProductSchema,
   adminCategorySchema,
   orderStatusSchema,
+  signupSchema,
+  customerLoginSchema,
+  profileUpdateSchema,
+  changePasswordSchema,
+  addressSchema,
 };

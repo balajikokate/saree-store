@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useState } from "react";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "ovee_collection_cart_v1";
@@ -63,6 +63,12 @@ function cartReducer(state, action) {
 export function CartProvider({ children }) {
   const [state, dispatch] = useReducer(cartReducer, undefined, loadInitialState);
 
+  // "Buy Now" state is intentionally SEPARATE from the persistent cart above:
+  // it lives only in memory (not localStorage), so clicking "Buy Now" never
+  // adds the item to the shopper's actual cart or merges with what's already
+  // in it. Checkout reads this instead of the cart when it's set.
+  const [buyNowItem, setBuyNowItem] = useState(null);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
@@ -80,8 +86,20 @@ export function CartProvider({ children }) {
         dispatch({ type: "UPDATE_QUANTITY", payload: { productId, quantity } }),
       removeItem: (productId) => dispatch({ type: "REMOVE_ITEM", payload: { productId } }),
       clearCart: () => dispatch({ type: "CLEAR_CART" }),
+
+      buyNowItem,
+      startBuyNow: (product, quantity = 1) =>
+        setBuyNowItem({
+          productId: product.id,
+          name: product.name,
+          slug: product.slug,
+          image: product.images?.[0],
+          price: Number(product.discountPrice ?? product.price),
+          quantity,
+        }),
+      endBuyNow: () => setBuyNowItem(null),
     };
-  }, [state]);
+  }, [state, buyNowItem]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

@@ -4,11 +4,14 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const compression = require("compression");
+const cookieParser = require("cookie-parser");
 const path = require("path");
 
 const productRoutes = require("./routes/product.routes");
 const orderRoutes = require("./routes/order.routes");
 const adminRoutes = require("./routes/admin.routes");
+const webhookRoutes = require("./routes/webhook.routes");
+const customerRoutes = require("./routes/customer.routes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
@@ -21,8 +24,16 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 // Gzip/Brotli-compress JSON and static responses — meaningfully cuts
 // transfer size and speeds up perceived load time on slower connections.
 app.use(compression());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({
+  limit: "1mb",
+  verify: (req, res, buf) => {
+    // Preserved for webhook signature verification (see webhook.controller.js).
+    // Negligible overhead — just holds a reference to the already-read buffer.
+    req.rawBody = buf;
+  },
+}));
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
+app.use(cookieParser());
 
 // Serve product images: put files under backend/public/images/products/<category-slug>/
 // and reference them in the DB as "/images/products/<category-slug>/<filename>"
@@ -63,6 +74,8 @@ app.get("/health", (req, res) => res.json({ status: "ok", uptime: process.uptime
 app.use("/api", productRoutes);
 app.use("/api", orderRoutes);
 app.use("/api", adminRoutes);
+app.use("/api", webhookRoutes);
+app.use("/api", customerRoutes);
 
 // --- 404 + error handling (must be last) ---
 app.use(notFound);

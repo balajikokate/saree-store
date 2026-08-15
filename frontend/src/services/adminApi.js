@@ -1,28 +1,22 @@
 import axios from "axios";
 import { ASSET_BASE_URL } from "./api";
-import { TOKEN_KEY } from "../context/AdminAuthContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const adminApi = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20000,
-});
-
-adminApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  // REQUIRED for the httpOnly admin session cookie to be sent/received on
+  // cross-origin requests (frontend and backend live on different domains
+  // in production — e.g. vercel.app talking to onrender.com).
+  withCredentials: true,
 });
 
 adminApi.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      if (!window.location.pathname.includes("/admin/login")) {
-        window.location.href = "/admin/login";
-      }
+    if (error.response?.status === 401 && !window.location.pathname.includes("/admin/login")) {
+      window.location.href = "/admin/login";
     }
     const message = error.response?.data?.message || error.message || "Something went wrong.";
     return Promise.reject(new Error(message));
@@ -31,6 +25,8 @@ adminApi.interceptors.response.use(
 
 export const authApi = {
   login: (email, password) => adminApi.post("/admin/login", { email, password }),
+  logout: () => adminApi.post("/admin/logout"),
+  me: () => adminApi.get("/admin/me"),
 };
 
 export const adminProductApi = {

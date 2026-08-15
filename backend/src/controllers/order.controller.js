@@ -4,14 +4,23 @@ const { getRazorpay } = require("../config/razorpay");
 const asyncHandler = require("../utils/asyncHandler");
 const { ApiError } = require("../middleware/errorHandler");
 const { checkoutSchema, verifyPaymentSchema } = require("../utils/validators");
+const { markOrderPaid } = require("../services/orderFulfillment");
 
 const SHIPPING_FLAT_FEE = 0; // free shipping storewide; change if needed
+
 const FREE_SHIPPING_THRESHOLD = 1999;
 
+// The order number doubles as a public "access key" — anyone who has it can
+// look up the order's name/address/phone with no login (this is what makes
+// guest checkout confirmation possible without an account). A short/
+// sequential suffix would make other people's orders guessable by brute
+// force. A cryptographically random 8-character suffix makes that
+// practically infeasible (36^8 ≈ 2.8 trillion combinations) while staying
+// short enough to read aloud or type into a support ticket.
 function generateOrderNumber() {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `SS-${date}-${rand}`;
+  const suffix = crypto.randomBytes(6).toString("base64url").slice(0, 8).toUpperCase();
+  return `SS-${date}-${suffix}`;
 }
 
 /**
@@ -65,6 +74,7 @@ const checkout = asyncHandler(async (req, res) => {
   const order = await prisma.order.create({
     data: {
       orderNumber: generateOrderNumber(),
+      userId: req.user?.sub || null, // linked if logged in, null for guest checkout
       customerName: customer.name,
       email: customer.email,
       phone: customer.phone,
@@ -135,25 +145,15 @@ const verifyPayment = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Payment signature verification failed");
   }
 
-  // Signature valid — mark paid and decrement stock atomically
-  const orderItems = await prisma.orderItem.findMany({ where: { orderId: order.id } });
-
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: "PAID",
-        razorpayPaymentId: razorpay_payment_id,
-        razorpaySignature: razorpay_signature,
-      },
-    }),
-    ...orderItems.map((item) =>
-      prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      })
-    ),
-  ]);
+  // Signature valid — mark paid and decrement stock, idempotently. If
+  // Razorpay's webhook already processed this exact order (a race is
+  // possible: webhook and browser can both arrive close together),
+  // markOrderPaid detects that and safely skips reprocessing.
+  await markOrderPaid({
+    orderId: order.id,
+    razorpayPaymentId: razorpay_payment_id,
+    razorpaySignature: razorpay_signature,
+  });
 
   res.json({ success: true, data: { orderNumber: order.orderNumber } });
 });

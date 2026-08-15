@@ -160,12 +160,12 @@ export default function AdminProductForm() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Fabric" name="fabric" value={form.fabric} onChange={handleChange} required />
           <Field label="Color" name="color" value={form.color} onChange={handleChange} required />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-ink/80">Occasion</label>
             <select name="occasion" value={form.occasion} onChange={handleChange} className="input-field">
@@ -189,7 +189,7 @@ export default function AdminProductForm() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="MRP (₹)" name="price" type="number" min="1" value={form.price} onChange={handleChange} required />
           <Field label="Selling Price (₹)" name="discountPrice" type="number" min="1" value={form.discountPrice} onChange={handleChange} hint="Optional" />
           <Field label="Stock" name="stock" type="number" min="0" value={form.stock} onChange={handleChange} required />

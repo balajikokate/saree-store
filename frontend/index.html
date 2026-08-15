@@ -14,6 +14,36 @@
       href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!--
+      Content-Security-Policy: restricts what this page is allowed to load
+      or execute, so that even if an XSS bug slipped in somewhere, an
+      attacker's injected <script> or unexpected external request would
+      still be blocked by the browser itself.
+
+      Kept deliberately permissive toward Razorpay (https://*.razorpay.com)
+      since their checkout widget loads scripts/iframes from several of
+      their own subdomains and this list isn't fully published — a stricter
+      allowlist here risks silently breaking real payments. Everything
+      else is locked to 'self' (this site only).
+
+      If you ever see "Refused to ... because it violates the following
+      Content Security Policy directive" in the browser console, that
+      names exactly which directive to loosen — check the Performance/CSP
+      section of README.md before changing this.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+        script-src 'self' https://checkout.razorpay.com;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com data:;
+        img-src 'self' data: %VITE_API_ORIGIN% https:;
+        connect-src 'self' %VITE_API_ORIGIN% https://*.razorpay.com https://lumberjack.razorpay.com;
+        frame-src https://*.razorpay.com;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self' https://*.razorpay.com;"
+    />
   </head>
   <body class="bg-ivory font-body text-ink">
     <div id="root"></div>

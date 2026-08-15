@@ -6,7 +6,7 @@ const SORT_OPTIONS = [
   { value: "price_desc", label: "Price: High to Low" },
 ];
 
-export default function ProductFilters({ filters, categories, onChange, onClear }) {
+export default function ProductFilters({ filters, categories, onChange, onClear, footer }) {
   const set = (key, value) => onChange({ ...filters, [key]: value });
 
   return (
@@ -98,6 +98,8 @@ export default function ProductFilters({ filters, categories, onChange, onClear 
       <button onClick={onClear} className="text-sm font-medium text-maroon underline">
         Clear all filters
       </button>
+
+      {footer}
     </aside>
   );
 }

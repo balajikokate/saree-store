@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { orderApi } from "../services/api";
+import { useCustomerAuth } from "../context/CustomerAuthContext";
+import { orderApi, accountApi } from "../services/api";
 import CartSummary from "../components/cart/CartSummary";
 import Button from "../components/common/Button";
 import EmptyState from "../components/common/EmptyState";
@@ -15,15 +17,22 @@ const initialForm = {
   pincode: "",
 };
 
-function validate(form) {
+const FIELD_VALIDATORS = {
+  name: (v) => (v.trim().length < 2 ? "Enter your full name" : ""),
+  email: (v) => (!/^\S+@\S+\.\S+$/.test(v) ? "Enter a valid email" : ""),
+  phone: (v) => (!/^[6-9]\d{9}$/.test(v) ? "Enter a valid 10-digit mobile number" : ""),
+  addressLine: (v) => (v.trim().length < 5 ? "Enter your full address" : ""),
+  city: (v) => (v.trim().length < 2 ? "Enter your city" : ""),
+  state: (v) => (v.trim().length < 2 ? "Enter your state" : ""),
+  pincode: (v) => (!/^\d{6}$/.test(v) ? "Enter a valid 6-digit pincode" : ""),
+};
+
+function validateAll(form) {
   const errors = {};
-  if (form.name.trim().length < 2) errors.name = "Enter your full name";
-  if (!/^\S+@\S+\.\S+$/.test(form.email)) errors.email = "Enter a valid email";
-  if (!/^[6-9]\d{9}$/.test(form.phone)) errors.phone = "Enter a valid 10-digit mobile number";
-  if (form.addressLine.trim().length < 5) errors.addressLine = "Enter your full address";
-  if (form.city.trim().length < 2) errors.city = "Enter your city";
-  if (form.state.trim().length < 2) errors.state = "Enter your state";
-  if (!/^\d{6}$/.test(form.pincode)) errors.pincode = "Enter a valid 6-digit pincode";
+  for (const field of Object.keys(FIELD_VALIDATORS)) {
+    const msg = FIELD_VALIDATORS[field](form[field]);
+    if (msg) errors[field] = msg;
+  }
   return errors;
 }
 
@@ -39,12 +48,56 @@ function loadRazorpayScript() {
 }
 
 export default function Checkout() {
-  const { items, subtotal, clearCart } = useCart();
+  const { items: cartItems, subtotal: cartSubtotal, clearCart } = useCart();
+  const { isAuthenticated, user } = useCustomerAuth();
+  const location = useLocation();
+
+  // "Buy Now" arrives with a single item in router state and must NOT touch
+  // the persisted cart — it's an independent purchase. Fall back to the
+  // regular cart otherwise.
+  const buyNowItem = location.state?.buyNowItem || null;
+  const items = useMemo(() => (buyNowItem ? [buyNowItem] : cartItems), [buyNowItem, cartItems]);
+  const subtotal = useMemo(
+    () => (buyNowItem ? buyNowItem.price * buyNowItem.quantity : cartSubtotal),
+    [buyNowItem, cartSubtotal]
+  );
 
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+
+  // Prefill name/email for logged-in customers, and offer their saved
+  // addresses so they don't have to retype anything.
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    setForm((f) => ({ ...f, name: f.name || user.name || "", email: f.email || user.email || "" }));
+    accountApi.addresses
+      .list()
+      .then((res) => {
+        setSavedAddresses(res.data);
+        const defaultAddr = res.data.find((a) => a.isDefault);
+        if (defaultAddr) applyAddress(defaultAddr);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user]);
+
+  const applyAddress = (addr) => {
+    setSelectedAddressId(addr.id);
+    setForm((f) => ({
+      ...f,
+      name: addr.fullName,
+      phone: addr.phone,
+      addressLine: addr.addressLine,
+      city: addr.city,
+      state: addr.state,
+      pincode: addr.pincode,
+    }));
+  };
 
   if (items.length === 0) {
     return (
@@ -59,15 +112,27 @@ export default function Checkout() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    const nextForm = { ...form, [name]: value };
+    setForm(nextForm);
+    setTouched((t) => ({ ...t, [name]: true }));
+    // Validate live, as the person types — but only surface the error for
+    // the field they've actually touched, so we're not flashing "invalid"
+    // messages on fields they haven't gotten to yet.
+    const msg = FIELD_VALIDATORS[name](value);
+    setErrors((prev) => ({ ...prev, [name]: msg }));
+  };
+
+  const handleBlur = (e) => {
+    setTouched((t) => ({ ...t, [e.target.name]: true }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError("");
-    const validationErrors = validate(form);
-    setErrors(validationErrors);
-    if (Object.keys(validationErrors).length > 0) return;
+    const allErrors = validateAll(form);
+    setErrors(allErrors);
+    setTouched(Object.fromEntries(Object.keys(FIELD_VALIDATORS).map((k) => [k, true])));
+    if (Object.values(allErrors).some(Boolean)) return;
 
     setSubmitting(true);
     try {
@@ -99,6 +164,14 @@ export default function Checkout() {
           contact: form.phone,
         },
         theme: { color: "#6E1423" },
+        // Deliberately NOT overriding config.display here. A hand-curated
+        // block/sequence list is fragile: if a listed method (e.g. UPI)
+        // happens to be disabled in your Razorpay Dashboard → Settings →
+        // Payment Methods, a custom config can silently hide it with no
+        // fallback. Razorpay's own default layout already puts UPI first
+        // for INR checkouts in India, so the safest, most robust choice is
+        // to let Razorpay decide the layout and just ensure every method
+        // you want is toggled ON in the Dashboard.
         handler: async (response) => {
           try {
             await orderApi.verifyPayment({
@@ -107,13 +180,11 @@ export default function Checkout() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            clearCart();
-            // Close the Razorpay widget explicitly, then do a FULL browser
-            // navigation (not client-side routing) to the success page.
-            // Razorpay's checkout SDK injects iframes and background
-            // listeners into the page; a normal SPA route change leaves
-            // those running indefinitely since the document never reloads.
-            // A hard redirect guarantees they're fully torn down.
+            // Only clear the persisted cart if this was a cart checkout —
+            // a "Buy Now" purchase never touched the cart, so there's
+            // nothing to clear (and clearing it would wrongly wipe out
+            // unrelated items the customer still has saved).
+            if (!buyNowItem) clearCart();
             rzp.close();
             window.location.href = `/order-success/${orderNumber}`;
           } catch (err) {
@@ -139,23 +210,57 @@ export default function Checkout() {
   };
 
   return (
-    <div className="container-page py-12">
-      <h1 className="font-display text-3xl text-ink">Checkout</h1>
+    <div className="container-page py-8 sm:py-12">
+      <h1 className="font-display text-2xl text-ink sm:text-3xl">Checkout</h1>
+      {buyNowItem && (
+        <p className="mt-1 text-sm text-ink/60">
+          Buying this item directly — your saved cart is untouched.
+        </p>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-10 md:grid-cols-[1fr_340px]">
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           <h2 className="font-display text-lg text-ink">Shipping Details</h2>
 
-          <Field label="Full Name" name="name" value={form.name} onChange={handleChange} error={errors.name} />
+          {!isAuthenticated && (
+            <p className="rounded-sm bg-blush/60 px-4 py-3 text-sm text-ink/70">
+              <Link to="/login" state={{ from: location }} className="font-medium text-maroon underline">
+                Log in
+              </Link>{" "}
+              for faster checkout next time, or continue as a guest below.
+            </p>
+          )}
+
+          {isAuthenticated && savedAddresses.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink/80">Use a saved address</label>
+              <select
+                value={selectedAddressId}
+                onChange={(e) => {
+                  const addr = savedAddresses.find((a) => a.id === e.target.value);
+                  if (addr) applyAddress(addr);
+                }}
+                className="input-field"
+              >
+                {savedAddresses.map((addr) => (
+                  <option key={addr.id} value={addr.id}>
+                    {addr.label} — {addr.addressLine}, {addr.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <Field label="Full Name" name="name" value={form.name} onChange={handleChange} onBlur={handleBlur} error={touched.name ? errors.name : ""} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} error={errors.email} />
-            <Field label="Phone" name="phone" type="tel" value={form.phone} onChange={handleChange} error={errors.phone} />
+            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} onBlur={handleBlur} error={touched.email ? errors.email : ""} />
+            <Field label="Phone" name="phone" type="tel" value={form.phone} onChange={handleChange} onBlur={handleBlur} error={touched.phone ? errors.phone : ""} />
           </div>
-          <Field label="Address" name="addressLine" value={form.addressLine} onChange={handleChange} error={errors.addressLine} />
+          <Field label="Address" name="addressLine" value={form.addressLine} onChange={handleChange} onBlur={handleBlur} error={touched.addressLine ? errors.addressLine : ""} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="City" name="city" value={form.city} onChange={handleChange} error={errors.city} />
-            <Field label="State" name="state" value={form.state} onChange={handleChange} error={errors.state} />
-            <Field label="Pincode" name="pincode" value={form.pincode} onChange={handleChange} error={errors.pincode} />
+            <Field label="City" name="city" value={form.city} onChange={handleChange} onBlur={handleBlur} error={touched.city ? errors.city : ""} />
+            <Field label="State" name="state" value={form.state} onChange={handleChange} onBlur={handleBlur} error={touched.state ? errors.state : ""} />
+            <Field label="Pincode" name="pincode" value={form.pincode} onChange={handleChange} onBlur={handleBlur} error={touched.pincode ? errors.pincode : ""} />
           </div>
 
           {serverError && (
@@ -170,13 +275,13 @@ export default function Checkout() {
           </p>
         </form>
 
-        <CartSummary subtotal={subtotal} />
+        <CartSummary subtotal={subtotal} items={items} />
       </div>
     </div>
   );
 }
 
-function Field({ label, name, type = "text", value, onChange, error }) {
+function Field({ label, name, type = "text", value, onChange, onBlur, error }) {
   return (
     <div>
       <label htmlFor={name} className="mb-1 block text-sm font-medium text-ink/80">
@@ -188,6 +293,7 @@ function Field({ label, name, type = "text", value, onChange, error }) {
         type={type}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         className="input-field"
         aria-invalid={!!error}
         aria-describedby={error ? `${name}-error` : undefined}

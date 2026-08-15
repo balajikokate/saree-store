@@ -5,6 +5,7 @@ import { useCart } from "../context/CartContext";
 import PriceTag from "../components/common/PriceTag";
 import Button from "../components/common/Button";
 import Loader from "../components/common/Loader";
+import ProductGrid from "../components/product/ProductGrid";
 import { resolveImageUrl } from "../utils/image";
 
 export default function ProductDetail() {
@@ -18,11 +19,13 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [added, setAdded] = useState(false);
+  const [related, setRelated] = useState([]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setNotFound(false);
+    setRelated([]);
     productApi
       .getBySlug(slug)
       .then((res) => {
@@ -30,6 +33,18 @@ export default function ProductDetail() {
         setProduct(res.data);
         setActiveImage(0);
         setQuantity(1);
+        window.scrollTo({ top: 0, behavior: "instant" in window.history ? "instant" : "auto" });
+
+        // Fetch a few more sarees from the same category for "You may also like"
+        if (res.data.category?.slug) {
+          productApi
+            .list({ category: res.data.category.slug, limit: 5 })
+            .then((relatedRes) => {
+              if (!active) return;
+              setRelated(relatedRes.data.filter((p) => p.id !== res.data.id).slice(0, 4));
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => active && setNotFound(true))
       .finally(() => active && setLoading(false));
@@ -57,13 +72,27 @@ export default function ProductDetail() {
   };
 
   const handleBuyNow = () => {
-    addItem(product, quantity);
-    navigate("/checkout");
+    // Deliberately does NOT touch the shared cart — "Buy Now" is an
+    // independent, single-item purchase. If it called addItem() here, it
+    // would merge into whatever's already in the customer's cart, and the
+    // checkout page would show the whole cart instead of just this item.
+    navigate("/checkout", {
+      state: {
+        buyNowItem: {
+          productId: product.id,
+          name: product.name,
+          slug: product.slug,
+          image: product.images?.[0],
+          price: Number(product.discountPrice ?? product.price),
+          quantity,
+        },
+      },
+    });
   };
 
   return (
-    <div className="container-page py-12">
-      <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+    <div className="container-page py-8 sm:py-12">
+      <div className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-2">
         {/* Gallery */}
         <div>
           <div className="aspect-[3/4] overflow-hidden rounded-sm bg-blush">
@@ -71,6 +100,7 @@ export default function ProductDetail() {
               src={resolveImageUrl(product.images[activeImage])}
               alt={product.name}
               className="h-full w-full object-cover"
+              fetchPriority="high"
             />
           </div>
           {product.images.length > 1 && (
@@ -83,7 +113,7 @@ export default function ProductDetail() {
                     idx === activeImage ? "border-maroon" : "border-transparent"
                   }`}
                 >
-                  <img src={resolveImageUrl(img)} alt="" className="h-full w-full object-cover" />
+                  <img src={resolveImageUrl(img)} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
                 </button>
               ))}
             </div>
@@ -93,7 +123,7 @@ export default function ProductDetail() {
         {/* Details */}
         <div>
           <p className="text-xs uppercase tracking-wide text-ink/50">{product.category?.name}</p>
-          <h1 className="mt-1 font-display text-3xl text-ink">{product.name}</h1>
+          <h1 className="mt-1 font-display text-2xl text-ink sm:text-3xl">{product.name}</h1>
           <div className="mt-3">
             <PriceTag
               price={product.discountPrice ?? product.price}
@@ -147,7 +177,8 @@ export default function ProductDetail() {
             </div>
           )}
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          {/* Sticky-ish action bar on mobile so buttons are always reachable */}
+          <div className="sticky bottom-0 -mx-4 mt-6 flex flex-col gap-3 border-t border-ink/10 bg-ivory/95 px-4 py-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
             <Button variant="secondary" disabled={product.stock === 0} onClick={handleAddToCart} className="flex-1">
               {added ? "Added ✓" : "Add to Cart"}
             </Button>
@@ -157,6 +188,15 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {related.length > 0 && (
+        <section className="mt-16 sm:mt-20">
+          <h2 className="font-display text-xl text-ink sm:text-2xl">You may also like</h2>
+          <div className="mt-6">
+            <ProductGrid products={related} />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

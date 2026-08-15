@@ -9,6 +9,7 @@ export const ASSET_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
+  withCredentials: true, // sends/receives the customer session cookie, when present
 });
 
 // Normalize errors so components can just read `error.message`
@@ -32,6 +33,28 @@ export const orderApi = {
   checkout: (payload) => api.post("/orders/checkout", payload),
   verifyPayment: (payload) => api.post("/orders/verify-payment", payload),
   getByNumber: (orderNumber) => api.get(`/orders/${orderNumber}`),
+};
+
+export const authApi = {
+  signup: (data) => api.post("/auth/signup", data),
+  login: (email, password) => api.post("/auth/login", { email, password }),
+  logout: () => api.post("/auth/logout"),
+  me: () => api.get("/auth/me"),
+};
+
+export const accountApi = {
+  updateProfile: (data) => api.patch("/account/profile", data),
+  changePassword: (data) => api.post("/account/change-password", data),
+  addresses: {
+    list: () => api.get("/account/addresses"),
+    create: (data) => api.post("/account/addresses", data),
+    update: (id, data) => api.put(`/account/addresses/${id}`, data),
+    remove: (id) => api.delete(`/account/addresses/${id}`),
+  },
+  orders: {
+    list: () => api.get("/account/orders"),
+    get: (orderNumber) => api.get(`/account/orders/${orderNumber}`),
+  },
 };
 
 export default api;

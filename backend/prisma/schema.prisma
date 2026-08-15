@@ -19,6 +19,35 @@ enum OrderStatus {
   CANCELLED
 }
 
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  phone        String?
+  addresses    Address[]
+  orders       Order[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  label       String   @default("Home") // e.g. Home, Work, Other — free text
+  fullName    String
+  phone       String
+  addressLine String
+  city        String
+  state       String
+  pincode     String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
 model Category {
   id        String    @id @default(uuid())
   name      String    @unique
@@ -54,6 +83,8 @@ model Product {
 model Order {
   id                String      @id @default(uuid())
   orderNumber       String      @unique // human friendly, e.g. SS-20260813-0001
+  user              User?       @relation(fields: [userId], references: [id])
+  userId            String? // null for guest checkout
   customerName      String
   email             String
   phone             String
@@ -73,6 +104,7 @@ model Order {
   updatedAt         DateTime    @updatedAt
 
   @@index([email])
+  @@index([userId])
   @@index([razorpayOrderId])
 }
 

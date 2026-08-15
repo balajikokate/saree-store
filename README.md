@@ -11,14 +11,17 @@ saree-store/
 ## What's included
 
 - Product catalog with category/fabric/occasion/price filters, search, sort, pagination
-- Product detail pages with image gallery
-- Cart (persisted to localStorage) — no login required, guest checkout
-- Checkout with server-side price validation + Razorpay payment (UPI/cards/netbanking)
-- Server-side payment signature verification (never trust client-side "success" alone)
-- Order confirmation page
-- Reusable component library, security middleware (helmet, rate limiting, CORS), centralized error handling
-
-Not included yet (by your choice — storefront-only scope): admin panel, user accounts/login, reviews, wishlist. The `Order` and `Product` models are already structured so you can add these later without a redesign — just ask and I'll build them.
+- Product detail pages with image gallery, related "You may also like" products
+- Cart (persisted to localStorage) and guest checkout — no account required
+- Customer accounts: signup/login, saved addresses, order history, checkout auto-fill
+- Checkout with server-side price validation + Razorpay payment (UPI/cards/netbanking), live field validation
+- Server-side payment signature verification + webhook for reliable confirmation (never trust client-side "success" alone)
+- Order confirmation page, order status tracking
+- Admin panel: product/category management with image upload, order management, dashboard
+- Order notifications via email/SMS/WhatsApp (all optional, independently configured)
+- httpOnly-cookie sessions, brute-force lockout, tightened CSP — see Security section
+- Reusable component library, security middleware (helmet, rate limiting, CORS, compression), centralized error handling
+- Mobile-friendly throughout (storefront and admin)
 
 ---
 
@@ -46,7 +49,8 @@ npm run dev                           # starts API on http://localhost:5000
 ```bash
 cd frontend
 cp .env.example .env
-# VITE_API_URL defaults to http://localhost:5000/api — fine for local dev
+# VITE_API_URL and VITE_API_ORIGIN default to localhost — fine for local dev.
+# Both must always be set together (see the Security section below for why).
 npm install
 npm run dev                           # starts app on http://localhost:5173
 ```
@@ -94,9 +98,14 @@ This stack costs **₹0/month** to start (all free tiers), scaling only when you
 ### Step 3 — Frontend on Vercel
 1. In Vercel: **New Project**, import the same repo, set **Root Directory** to `frontend`
 2. Framework preset: Vite (auto-detected)
-3. Add environment variable: `VITE_API_URL` → `https://<your-render-service>.onrender.com/api`
+3. Add **both** of these environment variables (both required together — see the ⚠️ warning below):
+   - `VITE_API_URL` → `https://<your-render-service>.onrender.com/api`
+   - `VITE_API_ORIGIN` → `https://<your-render-service>.onrender.com` (same URL, but **no** `/api` at the end, **no** trailing slash)
 4. Deploy. Vercel gives you a URL like `https://vastra.vercel.app`
 5. Go back to Render and update `CLIENT_URL` to that Vercel URL, then redeploy the backend (needed for CORS to allow requests)
+
+> ⚠️ **`VITE_API_ORIGIN` is not optional.** It's used to build the site's Content-Security-Policy, which tells the browser which servers the page is allowed to talk to. If it's missing, the browser will silently **block every API call** (products won't load, checkout won't work) because the security policy won't include your real backend as an allowed destination. If your deployed site suddenly shows no products or a blank page after a deploy, this is the first thing to check — open the browser console, and a CSP violation will say so explicitly.
+
 
 ### Step 4 — Go live with real payments
 1. Complete Razorpay KYC (business details, bank account) — required before accepting real money
@@ -140,7 +149,121 @@ Manage products and orders through a web UI instead of editing the database dire
 - Deleting a product that has past orders isn't allowed (it would break order history) — the panel automatically sets its stock to 0 instead, which hides it from the storefront while preserving your order records.
 - On Render's free tier, uploaded images live on an ephemeral filesystem and can be lost on redeploy — for anything beyond casual testing, consider moving to Cloudinary/S3 for uploaded images (ask if you want this wired in).
 
-## 4. Performance — read this before running Lighthouse
+## 4. Reliable Payment Confirmation (Webhook)
+
+Previously, an order was only marked "PAID" when the customer's own browser called your server right after Razorpay's popup closed. If their internet dropped or they closed the tab in that split second, Razorpay would have their money but your database would still show "PENDING."
+
+**This is now fixed with a Razorpay webhook** — Razorpay's servers call your backend directly to confirm payment, independent of the customer's browser. Set it up once:
+
+1. In your Razorpay Dashboard: **Settings → Webhooks → Add New Webhook**
+2. **Webhook URL:** `https://your-backend-url.onrender.com/api/webhooks/razorpay`
+3. **Active events:** check `payment.captured` and `payment.failed`
+4. Razorpay will show you a **Webhook Secret** — copy it
+5. In `backend/.env` (and in Render's environment variables once deployed), set:
+   ```
+   RAZORPAY_WEBHOOK_SECRET="paste-the-webhook-secret-here"
+   ```
+6. Restart the backend
+
+This is safe to run alongside the existing browser-based confirmation — whichever one arrives first (browser or webhook) processes the order; the other is automatically ignored, so stock is never decremented twice and notifications are never sent twice, even if both happen to fire at almost the same moment.
+
+## 5. Order Notifications (Email, SMS, WhatsApp)
+
+When an order is confirmed as paid, the store can automatically notify **both the customer and you (the admin)** by email, SMS, and WhatsApp. Every channel is optional and independent — configure any combination (or none) and the store works fine either way; unconfigured channels are just silently skipped.
+
+### Email (via Resend)
+1. Sign up free at https://resend.com
+2. Get an API key from the dashboard
+3. In `backend/.env`:
+   ```
+   RESEND_API_KEY="re_xxxxxxxxxxxx"
+   RESEND_FROM_EMAIL="orders@yourdomain.com"
+   ```
+   For quick testing without owning a domain yet, Resend provides a shared testing address (check their dashboard for the current one) — but for real customer emails, verify your own domain in Resend (their dashboard walks you through the DNS records).
+4. Optionally set `ADMIN_NOTIFY_EMAIL` if you want admin alerts to go somewhere other than your `ADMIN_EMAIL` login address.
+
+### SMS + WhatsApp (via Twilio)
+1. Sign up at https://twilio.com (free trial includes credit)
+2. Get your **Account SID** and **Auth Token** from the Twilio Console
+3. Buy/activate a Twilio phone number for SMS
+4. In `backend/.env`:
+   ```
+   TWILIO_ACCOUNT_SID="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   TWILIO_AUTH_TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   TWILIO_SMS_FROM="+1xxxxxxxxxx"
+   TWILIO_WHATSAPP_FROM="+14155238886"
+   ADMIN_NOTIFY_PHONE="9876543210"
+   ```
+
+**Important trial-account limits to know about (not a bug — this is how Twilio works):**
+- A **trial** Twilio account can only send SMS/WhatsApp to phone numbers you've manually verified in the Twilio Console. Fine for testing your own number; you'll need to upgrade to a paid Twilio account (pay-as-you-go, quite cheap per message) before it can message real customers.
+- Twilio's **WhatsApp sandbox** (the default `+14155238886` number) requires each recipient to first send "join `<your-sandbox-code>`" to that number once. This is fine for testing but not usable for real customers — for production WhatsApp messaging, you'd need to apply for a WhatsApp Business Sender through Twilio, which involves Meta's business verification process (takes some days, is a separate approval step).
+
+**Practical recommendation:** start with email only (Resend is simple and works for real customers immediately with no waiting period). Add SMS once you've upgraded Twilio past trial. Treat WhatsApp as a later addition once you're ready for Meta's business verification — it's the most valuable channel for Indian customers but also the slowest to set up properly.
+
+## 6. Category Management
+
+You can now add new saree categories directly from the admin panel — no code or database editing needed:
+
+- Go to **Admin → Categories**
+- Type a name (e.g. "Tussar Silk") and click **Add Category** — its URL slug and image folder are created automatically
+- The new category immediately appears in the category dropdown when adding/editing products
+
+## 7. Video Hero Banner
+
+The homepage hero now plays a short looping video instead of a static image (it still shows the static image as a poster/fallback while the video loads or if video can't play). A placeholder video ships at `frontend/src/assets/videos/hero-banner.mp4` — replace it with your own footage:
+
+- Keep it short (3-8 seconds is plenty for a looping banner) and under a few MB — a huge video file will hurt load speed just like an oversized photo would
+- Recommended format: MP4 (H.264), no audio needed (it plays muted anyway)
+- Same filename, or update the import path in `frontend/src/pages/Home.jsx`
+
+## 8. Mobile-Friendly Storefront & Admin
+
+- **Shop page filters** now open in a slide-up drawer on mobile (tap "Filters") instead of a cramped sidebar stacked above products
+- **Admin panel** sidebar collapses into a hamburger menu on mobile, and forms/tables reflow to a single column
+- **Product pages** show a sticky Add to Cart / Buy Now bar on mobile so it's always reachable while scrolling
+- **"You may also like"** related products now appear at the bottom of each product page (same category, excluding the current item)
+
+## 9. Customer Accounts
+
+Customers can now create an account, save addresses, and view order history — while guest checkout (no account needed) still works exactly as before.
+
+**What's included:**
+- Sign up / log in at `/signup` and `/login`
+- `/account` — edit name/phone, change password
+- `/account/addresses` — save multiple addresses, mark one as default, edit/delete
+- `/account/orders` — full order history for the logged-in customer
+- At checkout, a logged-in customer's default address auto-fills the form, and they can switch between any saved address from a dropdown
+- Guests see a "Log in for faster checkout" prompt but can dismiss it and check out without an account — nothing is forced
+
+**How it works technically:** customer sessions use the same httpOnly-cookie pattern as the admin panel (see the Security section below) rather than storing a token in localStorage — meaningfully more resistant to theft via any future XSS bug. Placing an order while logged in automatically links that order to the account (via the session cookie); placing one as a guest works identically to before, just without the account link.
+
+**Setting up locally:** no extra configuration needed beyond what's already in your `.env` — this reuses your existing `JWT_SECRET` and `DATABASE_URL`. Just run the Prisma migration below to create the new tables:
+```powershell
+cd backend
+npx prisma migrate dev --name add_user_accounts
+```
+
+## 10. Security Hardening (Admin & Customer Sessions)
+
+Three meaningful upgrades over the original implementation, all now in place:
+
+**1. httpOnly cookie sessions (both admin and customer logins)**
+Previously, the admin login token was stored in `localStorage`, which is readable by any JavaScript running on the page — meaning a single XSS bug anywhere in the app could let an attacker steal a live admin session. Both admin and customer sessions now live in httpOnly cookies instead: **not even your own frontend code can read the token**, which is precisely what makes it resistant to theft this way. The browser sends it automatically; your React code never touches it directly.
+
+*Deployment note:* this requires `CLIENT_URL` in `backend/.env` (and on Render) to be the **exact** frontend origin — no wildcards, no trailing slash — since cross-site cookies require it. Already documented in the deployment steps above, but worth re-checking if login stops working after a redeploy.
+
+**2. Tightened Content-Security-Policy**
+`frontend/index.html` now ships a CSP that restricts the page to only loading scripts/styles/connections from trusted sources (itself, Google Fonts, and Razorpay). Even if an XSS bug slipped past everything else, the browser itself would block an injected `<script>` tag or an unexpected request to an attacker's server. This required adding a new required env var — see the ⚠️ warning in the deployment section above (`VITE_API_ORIGIN`), which the CSP needs to know your real backend's address.
+
+**3. Brute-force lockout + email alert**
+Both admin and customer logins now lock out after 5 failed attempts within 15 minutes (separate from, and stricter than, the general rate limiter, which only slows requests but doesn't lock the account). On admin accounts specifically, crossing that threshold also sends you an email alert (reuses your existing Resend setup from Section 5 — no extra config).
+
+**Also fixed while reviewing this area:**
+- Customer-entered checkout fields (name, address) are now HTML-escaped before being embedded in notification emails — previously a malicious "customer" could have injected raw HTML/scripts into the emails sent to you.
+- Order numbers (used as a public "receipt lookup" key for guest order confirmation, no login required) now use a cryptographically random 8-character suffix instead of a guessable 4-digit one — makes enumerating other customers' order details impractical.
+
+## 11. Performance — read this before running Lighthouse
 
 **If you got a low Lighthouse score (e.g. ~30), you almost certainly tested `http://localhost:5173` while `npm run dev` was running.** Vite's dev server is intentionally unminified, unbundled per-module, and keeps a live-reload WebSocket open — it is *never* representative of real-world performance. Always test the **production build**:
 
@@ -164,13 +287,13 @@ Then run Lighthouse against the URL `npm run preview` gives you (usually `http:/
 
 The placeholder images this project ships with (`backend/scripts/generate-placeholder-images.js` output) are deliberately kept in that same 20–30KB range as a size target to match.
 
-## 5. Fixed: Razorpay scripts running after payment
+## 12. Fixed: Razorpay scripts running after payment
 
 Previously, after a successful payment the app used client-side routing (`navigate()`) to move to the order confirmation page. Razorpay's checkout SDK injects iframes and background listeners into the page for fraud detection — since a single-page app never actually reloads the document on a route change, those kept running indefinitely, even after navigating elsewhere.
 
 **Fix applied:** on successful payment, the app now calls `rzp.close()` and then does a **full browser navigation** (`window.location.href`) to the order confirmation page instead of a client-side route change. This guarantees the browser tears down everything Razorpay injected, exactly like closing and reopening a tab would. You shouldn't see any lingering network activity in DevTools after this.
 
-## 6. Adding your own saree photos
+## 13. Adding your own saree photos
 
 Product images live under `backend/public/images/products/<category-slug>/` and are served automatically by the backend at `/images/products/...` — no code changes needed.
 
@@ -191,16 +314,15 @@ Out of the box, `backend/scripts/generate-placeholder-images.js` fills these fol
 
 **When deploying:** Render's free tier has an ephemeral filesystem — files you upload directly on the server can disappear on redeploy. For production, either commit your image files to the repo (fine for a modest catalog) or move to a proper image host like Cloudinary/ImageKit/S3 and store full URLs in the `images` array instead of local paths (the frontend already supports both — see `frontend/src/utils/image.js`).
 
-## 7. Extending this later
+## 14. Extending this later
 
 Some natural next additions — say the word and I'll build any of these:
-- **User accounts** (signup/login, order history, saved addresses)
-- **Search & filters** enhancements, wishlist, product reviews
-- **Coupons/discounts**, abandoned cart emails
-- **Email notifications** on order confirmation (e.g. via Resend or SendGrid)
+- **Product reviews**, wishlist
+- **Coupons/discounts**, abandoned cart email reminders
 - **Multiple admin/staff logins** with roles, if one shared login stops being enough
 - **Cloud image storage** (Cloudinary/S3) so uploaded photos survive redeploys on free hosting tiers
+- **Password reset via email** ("forgot password" flow) — not yet built for either admin or customer accounts; currently a forgotten password requires manually resetting via `scripts/hash-password.js` (admin) or direct DB access (customer)
 
-## 8. Notes on the sample data
+## 15. Notes on the sample data
 
 `backend/prisma/seed.js` ships with simple generated placeholder images (see Section 3 above). Replace them with your real product photography before launch — ideally hosted on a CDN/image service (Cloudinary, ImageKit, or S3 + CloudFront) rather than committed to your repo, once your catalog grows.

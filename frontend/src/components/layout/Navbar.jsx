@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useCart } from "../../context/CartContext";
+import { useCustomerAuth } from "../../context/CustomerAuthContext";
 import logo from "../../assets/icons/ovee4.png";
 
 const navLinks = [
@@ -12,7 +13,16 @@ const navLinks = [
 
 export default function Navbar() {
   const { itemCount } = useCart();
+  const { isAuthenticated, user, logout } = useCustomerAuth();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    setAccountMenuOpen(false);
+    navigate("/");
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-ivory/95 backdrop-blur">
@@ -43,7 +53,68 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Account */}
+          <div className="relative hidden sm:block">
+            <button
+              onClick={() => setAccountMenuOpen((o) => !o)}
+              aria-label="Account"
+              aria-expanded={accountMenuOpen}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-blush"
+            >
+              <UserIcon />
+            </button>
+            {accountMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setAccountMenuOpen(false)} />
+                <div className="absolute right-0 z-50 mt-2 w-48 rounded-sm border border-ink/10 bg-white py-2 shadow-card">
+                  {isAuthenticated ? (
+                    <>
+                      <p className="truncate px-4 py-1.5 text-xs text-ink/50">{user?.email}</p>
+                      <Link
+                        to="/account"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-ink/80 hover:bg-blush"
+                      >
+                        My Account
+                      </Link>
+                      <Link
+                        to="/account/orders"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-ink/80 hover:bg-blush"
+                      >
+                        My Orders
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full px-4 py-2 text-left text-sm text-maroon hover:bg-blush"
+                      >
+                        Log out
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-ink/80 hover:bg-blush"
+                      >
+                        Log in
+                      </Link>
+                      <Link
+                        to="/signup"
+                        onClick={() => setAccountMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-ink/80 hover:bg-blush"
+                      >
+                        Create account
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
           <Link
             to="/cart"
             aria-label={`Cart, ${itemCount} item${itemCount === 1 ? "" : "s"}`}
@@ -80,6 +151,36 @@ export default function Navbar() {
               {link.label}
             </NavLink>
           ))}
+          <div className="mt-1 border-t border-ink/10 pt-2">
+            {isAuthenticated ? (
+              <>
+                <Link to="/account" onClick={() => setMenuOpen(false)} className="block rounded-sm px-2 py-3 text-sm font-medium text-ink/80 hover:bg-blush">
+                  My Account
+                </Link>
+                <Link to="/account/orders" onClick={() => setMenuOpen(false)} className="block rounded-sm px-2 py-3 text-sm font-medium text-ink/80 hover:bg-blush">
+                  My Orders
+                </Link>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="block w-full rounded-sm px-2 py-3 text-left text-sm font-medium text-maroon hover:bg-blush"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" onClick={() => setMenuOpen(false)} className="block rounded-sm px-2 py-3 text-sm font-medium text-ink/80 hover:bg-blush">
+                  Log in
+                </Link>
+                <Link to="/signup" onClick={() => setMenuOpen(false)} className="block rounded-sm px-2 py-3 text-sm font-medium text-ink/80 hover:bg-blush">
+                  Create account
+                </Link>
+              </>
+            )}
+          </div>
         </nav>
       )}
 
@@ -95,6 +196,15 @@ function CartIcon() {
       <path d="M3 3h2l2.4 12.2a2 2 0 002 1.8h8.2a2 2 0 002-1.7L21 8H6" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="10" cy="21" r="1.2" fill="currentColor" stroke="none" />
       <circle cx="18" cy="21" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20c1.5-3.5 5-5 7.5-5s6 1.5 7.5 5" strokeLinecap="round" />
     </svg>
   );
 }

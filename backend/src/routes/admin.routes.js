@@ -2,7 +2,7 @@ const router = require("express").Router();
 const rateLimit = require("express-rate-limit");
 const { requireAdmin } = require("../middleware/auth");
 const { upload } = require("../middleware/upload");
-const { login, me } = require("../controllers/auth.controller");
+const { login, logout, me } = require("../controllers/auth.controller");
 const {
   listAllProducts,
   getProductById,
@@ -28,6 +28,7 @@ const loginLimiter = rateLimit({
 });
 
 router.post("/admin/login", loginLimiter, login);
+router.post("/admin/logout", logout);
 
 // Everything below this line requires a valid admin session
 router.use("/admin", requireAdmin);

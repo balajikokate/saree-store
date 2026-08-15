@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { authApi } from "../../services/adminApi";
 import { useAdminAuth } from "../../context/AdminAuthContext";
 import Button from "../../components/common/Button";
 
@@ -19,8 +18,7 @@ export default function AdminLogin() {
     setError("");
     setSubmitting(true);
     try {
-      const res = await authApi.login(email, password);
-      login(res.data.token);
+      await login(email, password);
       const redirectTo = location.state?.from?.pathname || "/admin";
       navigate(redirectTo, { replace: true });
     } catch (err) {
