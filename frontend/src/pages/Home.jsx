@@ -56,7 +56,7 @@ export default function Home() {
           </div>
           <div className="relative aspect-[4/5] overflow-hidden rounded-sm">
             <video
-              className="h-full w-full object-cover"
+              className="h-full w-full"
               poster={bannerImage}
               autoPlay
               muted
