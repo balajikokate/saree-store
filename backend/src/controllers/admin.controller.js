@@ -3,6 +3,7 @@ const prisma = require("../lib/prisma");
 const asyncHandler = require("../utils/asyncHandler");
 const { ApiError } = require("../middleware/errorHandler");
 const { slugify } = require("../middleware/upload");
+const { streamInvoicePdf } = require("../services/invoice");
 
 // ---------- Products ----------
 
@@ -193,6 +194,16 @@ const getOrderById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: order });
 });
 
+// GET /api/admin/orders/:id/invoice
+const downloadOrderInvoice = asyncHandler(async (req, res) => {
+  const order = await prisma.order.findUnique({
+    where: { id: req.params.id },
+    include: { items: true },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+  streamInvoicePdf(order, res);
+});
+
 const VALID_STATUSES = ["PENDING", "PAID", "FAILED", "SHIPPED", "DELIVERED", "CANCELLED"];
 
 // PATCH /api/admin/orders/:id/status
@@ -208,14 +219,69 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: order });
 });
 
-// GET /api/admin/stats — quick dashboard numbers
+// GET /api/admin/stats — dashboard numbers + chart data
 const getDashboardStats = asyncHandler(async (req, res) => {
-  const [productCount, orderCount, revenue, lowStock] = await Promise.all([
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13); // includes today = 14 days total
+  fourteenDaysAgo.setHours(0, 0, 0, 0);
+
+  const [
+    productCount,
+    orderCount,
+    revenue,
+    lowStock,
+    recentPaidOrders,
+    statusGroups,
+    recentOrders,
+  ] = await Promise.all([
     prisma.product.count(),
     prisma.order.count({ where: { status: "PAID" } }),
     prisma.order.aggregate({ where: { status: "PAID" }, _sum: { totalAmount: true } }),
     prisma.product.count({ where: { stock: { lte: 5 } } }),
+    // Paid orders in the last 14 days, for the revenue trend chart
+    prisma.order.findMany({
+      where: { status: "PAID", createdAt: { gte: fourteenDaysAgo } },
+      select: { createdAt: true, totalAmount: true },
+    }),
+    // Count of orders per status, for the status breakdown chart
+    prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
+    // A handful of the most recent orders for a quick-glance list
+    prisma.order.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { id: true, orderNumber: true, customerName: true, totalAmount: true, status: true, createdAt: true },
+    }),
   ]);
+
+  // Bucket the last 14 days' paid orders into per-day revenue totals,
+  // including days with zero orders so the chart has a continuous x-axis.
+  const revenueByDay = {};
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(fourteenDaysAgo);
+    d.setDate(d.getDate() + i);
+    revenueByDay[d.toISOString().slice(0, 10)] = 0;
+  }
+  for (const order of recentPaidOrders) {
+    const key = order.createdAt.toISOString().slice(0, 10);
+    if (key in revenueByDay) revenueByDay[key] += Number(order.totalAmount);
+  }
+  const revenueTrend = Object.entries(revenueByDay).map(([date, total]) => ({ date, total }));
+
+  const statusBreakdown = statusGroups.map((g) => ({ status: g.status, count: g._count._all }));
+
+  // Top 5 best-selling products by quantity, across paid orders
+  const topProductsRaw = await prisma.orderItem.groupBy({
+    by: ["productId", "productName"],
+    where: { order: { status: "PAID" } },
+    _sum: { quantity: true },
+    orderBy: { _sum: { quantity: "desc" } },
+    take: 5,
+  });
+  const topProducts = topProductsRaw.map((p) => ({
+    productId: p.productId,
+    name: p.productName,
+    quantitySold: p._sum.quantity || 0,
+  }));
 
   res.json({
     success: true,
@@ -224,6 +290,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       orderCount,
       totalRevenue: revenue._sum.totalAmount || 0,
       lowStockCount: lowStock,
+      revenueTrend,
+      statusBreakdown,
+      topProducts,
+      recentOrders,
     },
   });
 });
@@ -240,5 +310,6 @@ module.exports = {
   listOrders,
   getOrderById,
   updateOrderStatus,
+  downloadOrderInvoice,
   getDashboardStats,
 };

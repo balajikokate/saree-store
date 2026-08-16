@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { productApi } from "../services/api";
 import ProductGrid from "../components/product/ProductGrid";
 import Loader from "../components/common/Loader";
+import { getRecentlyViewed } from "../utils/recentlyViewed";
 import bannerImage from "../assets/images/BrandImage.jpeg";
 import heroVideo from "../assets/videos/hero-banner.mp4";
 
@@ -14,20 +15,28 @@ const TRUST_BADGES = [
 ];
 
 export default function Home() {
+  const [newArrivals, setNewArrivals] = useState([]);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [recentlyViewed, setRecentlyViewed] = useState([]);
 
   useEffect(() => {
     let active = true;
-    // Single combined request — categories + a handful of products each —
-    // instead of one request per category (avoids a slow request waterfall).
-    productApi
-      .home({ limit: 4 })
-      .then((res) => {
-        if (active) setSections(res.data);
+    Promise.all([
+      productApi.list({ sort: "newest", limit: 8 }),
+      // Single combined request — categories + a handful of products each —
+      // instead of one request per category (avoids a slow request waterfall).
+      productApi.home({ limit: 4 }),
+    ])
+      .then(([newArrivalsRes, homeRes]) => {
+        if (!active) return;
+        setNewArrivals(newArrivalsRes.data);
+        setSections(homeRes.data);
       })
       .catch(() => {})
       .finally(() => active && setLoading(false));
+
+    setRecentlyViewed(getRecentlyViewed());
     return () => {
       active = false;
     };
@@ -56,7 +65,7 @@ export default function Home() {
           </div>
           <div className="relative aspect-[4/5] overflow-hidden rounded-sm">
             <video
-              className="h-full w-full"
+              className="h-full w-full object-cover"
               poster={bannerImage}
               autoPlay
               muted
@@ -89,42 +98,50 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Category quick links */}
-      <section className="container-page py-12 sm:py-16">
-        <h2 className="font-display text-xl text-ink sm:text-2xl">Shop by category</h2>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-          {sections.map(({ category }) => (
-            <Link
-              key={category.slug}
-              to={`/shop?category=${category.slug}`}
-              className="group relative aspect-square overflow-hidden rounded-sm bg-blush"
-            >
-              <div className="absolute inset-0 flex items-end bg-gradient-to-t from-ink/60 via-ink/0 to-ink/0 p-3 sm:p-4">
-                <span className="font-display text-base text-ivory sm:text-lg">{category.name}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Category-wise product rows */}
       {loading ? (
         <Loader label="Loading sarees" />
       ) : (
-        sections.map(({ category, products }) => {
-          if (!products || products.length === 0) return null;
-          return (
-            <section key={category.slug} className="container-page pb-12 sm:pb-16">
+        <>
+          {/* New Arrivals */}
+          {newArrivals.length > 0 && (
+            <section className="container-page py-12 sm:py-16">
               <div className="mb-5 flex items-center justify-between sm:mb-6">
-                <h2 className="font-display text-xl text-ink sm:text-2xl">{category.name}</h2>
-                <Link to={`/shop?category=${category.slug}`} className="text-sm font-medium text-maroon underline">
+                <div>
+                  <h2 className="font-display text-xl text-ink sm:text-2xl">New Arrivals</h2>
+                  <p className="mt-1 text-sm text-ink/60">Freshly added to the collection</p>
+                </div>
+                <Link to="/shop?sort=newest" className="text-sm font-medium text-maroon underline">
                   View all
                 </Link>
               </div>
-              <ProductGrid products={products} />
+              <ProductGrid products={newArrivals} />
             </section>
-          );
-        })
+          )}
+
+          {/* Category-wise product rows */}
+          {sections.map(({ category, products }) => {
+            if (!products || products.length === 0) return null;
+            return (
+              <section key={category.slug} className="container-page pb-12 sm:pb-16">
+                <div className="mb-5 flex items-center justify-between sm:mb-6">
+                  <h2 className="font-display text-xl text-ink sm:text-2xl">{category.name}</h2>
+                  <Link to={`/shop?category=${category.slug}`} className="text-sm font-medium text-maroon underline">
+                    View all
+                  </Link>
+                </div>
+                <ProductGrid products={products} />
+              </section>
+            );
+          })}
+
+          {/* Recently viewed */}
+          {recentlyViewed.length > 0 && (
+            <section className="container-page pb-12 sm:pb-16">
+              <h2 className="mb-5 font-display text-xl text-ink sm:mb-6 sm:text-2xl">Recently Viewed</h2>
+              <ProductGrid products={recentlyViewed} />
+            </section>
+          )}
+        </>
       )}
     </div>
   );

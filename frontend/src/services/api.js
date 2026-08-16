@@ -33,6 +33,26 @@ export const orderApi = {
   checkout: (payload) => api.post("/orders/checkout", payload),
   verifyPayment: (payload) => api.post("/orders/verify-payment", payload),
   getByNumber: (orderNumber) => api.get(`/orders/${orderNumber}`),
+  // Invoice is a direct download URL (Content-Disposition: attachment), not
+  // a JSON call — use as an <a href> or window.open() target.
+  invoiceUrl: (orderNumber) => `${ASSET_BASE_URL}/api/orders/${orderNumber}/invoice`,
+};
+
+export const settingsApi = {
+  get: () => api.get("/settings"),
+};
+
+export const reviewApi = {
+  list: (slug) => api.get(`/products/${slug}/reviews`),
+  submit: (slug, data) => api.post(`/products/${slug}/reviews`, data),
+};
+
+export const couponApi = {
+  validate: (code, subtotal) => api.post("/coupons/validate", { code, subtotal }),
+};
+
+export const wholesaleApi = {
+  submit: (data) => api.post("/wholesale", data),
 };
 
 export const authApi = {
@@ -51,9 +71,15 @@ export const accountApi = {
     update: (id, data) => api.put(`/account/addresses/${id}`, data),
     remove: (id) => api.delete(`/account/addresses/${id}`),
   },
+  wishlist: {
+    list: () => api.get("/account/wishlist"),
+    add: (productId) => api.post("/account/wishlist", { productId }),
+    remove: (productId) => api.delete(`/account/wishlist/${productId}`),
+  },
   orders: {
     list: () => api.get("/account/orders"),
     get: (orderNumber) => api.get(`/account/orders/${orderNumber}`),
+    invoiceUrl: (orderNumber) => `${ASSET_BASE_URL}/api/account/orders/${orderNumber}/invoice`,
   },
 };
 

@@ -17,6 +17,7 @@ export default function Shop() {
     category: searchParams.get("category") || "",
     fabric: searchParams.get("fabric") || "",
     occasion: searchParams.get("occasion") || "",
+    search: searchParams.get("search") || "",
     sort: searchParams.get("sort") || "newest",
     page: searchParams.get("page") || "1",
   };
@@ -72,8 +73,24 @@ export default function Shop() {
 
   return (
     <div className="container-page py-8 sm:py-12">
-      <h1 className="font-display text-2xl text-ink sm:text-3xl">All Sarees</h1>
-      <p className="mt-1 text-sm text-ink/60">{pagination.total ?? 0} sarees found</p>
+      <h1 className="font-display text-2xl text-ink sm:text-3xl">
+        {filters.search ? `Results for "${filters.search}"` : "All Sarees"}
+      </h1>
+      <p className="mt-1 text-sm text-ink/60">
+        {pagination.total ?? 0} sarees found
+        {filters.search && (
+          <button
+            onClick={() => {
+              const params = Object.fromEntries(searchParams);
+              delete params.search;
+              setSearchParams(params);
+            }}
+            className="ml-3 font-medium text-maroon underline"
+          >
+            Clear search
+          </button>
+        )}
+      </p>
 
       {/* Mobile filter trigger */}
       <div className="mt-4 flex items-center gap-2 md:hidden">

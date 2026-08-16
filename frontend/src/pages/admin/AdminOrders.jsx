@@ -31,9 +31,9 @@ export default function AdminOrders() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl text-ink">Orders</h1>
+      <h1 className="font-display text-2xl text-ink sm:text-3xl">Orders</h1>
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         {STATUSES.map((s) => (
           <button
             key={s || "all"}
@@ -52,40 +52,69 @@ export default function AdminOrders() {
       ) : orders.length === 0 ? (
         <p className="mt-10 text-sm text-ink/60">No orders found.</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-sm border border-ink/10 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-ink/10 bg-blush/40 text-xs uppercase tracking-wide text-ink/60">
-              <tr>
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Items</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink/10">
-              {orders.map((o) => (
-                <tr key={o.id}>
-                  <td className="px-4 py-3">
-                    <Link to={`/admin/orders/${o.id}`} className="font-medium text-maroon underline">
-                      {o.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-ink/70">{o.customerName}</td>
-                  <td className="px-4 py-3 text-ink/70">{o.items.length}</td>
-                  <td className="px-4 py-3 text-ink/70">{formatINR(o.totalAmount)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-sm px-2 py-1 text-xs font-semibold ${statusColor[o.status] || ""}`}>
-                      {o.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-ink/50">{new Date(o.createdAt).toLocaleDateString("en-IN")}</td>
+        <>
+          {/* Mobile: stacked cards */}
+          <div className="mt-6 space-y-3 sm:hidden">
+            {orders.map((o) => (
+              <Link
+                key={o.id}
+                to={`/admin/orders/${o.id}`}
+                className="block rounded-sm border border-ink/10 bg-white p-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-maroon">{o.orderNumber}</p>
+                    <p className="mt-0.5 truncate text-sm text-ink/70">{o.customerName}</p>
+                  </div>
+                  <span className={`flex-shrink-0 rounded-sm px-2 py-1 text-xs font-semibold ${statusColor[o.status] || ""}`}>
+                    {o.status}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-sm text-ink/60">
+                  <span>{o.items.length} item{o.items.length === 1 ? "" : "s"}</span>
+                  <span className="font-medium text-ink">{formatINR(o.totalAmount)}</span>
+                </div>
+                <p className="mt-1 text-xs text-ink/40">{new Date(o.createdAt).toLocaleDateString("en-IN")}</p>
+              </Link>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="mt-6 hidden overflow-x-auto rounded-sm border border-ink/10 bg-white sm:block">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-ink/10 bg-blush/40 text-xs uppercase tracking-wide text-ink/60">
+                <tr>
+                  <th className="px-4 py-3">Order</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Items</th>
+                  <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-ink/10">
+                {orders.map((o) => (
+                  <tr key={o.id}>
+                    <td className="px-4 py-3">
+                      <Link to={`/admin/orders/${o.id}`} className="font-medium text-maroon underline">
+                        {o.orderNumber}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-ink/70">{o.customerName}</td>
+                    <td className="px-4 py-3 text-ink/70">{o.items.length}</td>
+                    <td className="px-4 py-3 text-ink/70">{formatINR(o.totalAmount)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-sm px-2 py-1 text-xs font-semibold ${statusColor[o.status] || ""}`}>
+                        {o.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-ink/50">{new Date(o.createdAt).toLocaleDateString("en-IN")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

@@ -5,7 +5,9 @@ const {
   checkout,
   verifyPayment,
   getOrderByNumber,
+  downloadInvoice,
 } = require("../controllers/order.controller");
+const { validateCoupon } = require("../controllers/coupon.controller");
 
 // Limit checkout attempts to reduce abuse / accidental double submits
 const checkoutLimiter = rateLimit({
@@ -23,5 +25,7 @@ const checkoutLimiter = rateLimit({
 router.post("/orders/checkout", checkoutLimiter, attachCustomerIfPresent, checkout);
 router.post("/orders/verify-payment", checkoutLimiter, verifyPayment);
 router.get("/orders/:orderNumber", getOrderByNumber);
+router.get("/orders/:orderNumber/invoice", downloadInvoice);
+router.post("/coupons/validate", validateCoupon);
 
 module.exports = router;

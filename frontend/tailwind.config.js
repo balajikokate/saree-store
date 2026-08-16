@@ -5,22 +5,27 @@ export default {
     extend: {
       colors: {
         maroon: {
-          DEFAULT: "#6E1423",
-          dark: "#4A0D18",
-          light: "#8C2233",
+          DEFAULT: "rgb(var(--color-maroon) / <alpha-value>)",
+          dark: "rgb(var(--color-maroon-dark) / <alpha-value>)",
+          light: "rgb(var(--color-maroon-light) / <alpha-value>)",
         },
         gold: {
-          DEFAULT: "#C89B3C",
-          light: "#E4C77A",
-          dark: "#9C7526",
+          DEFAULT: "rgb(var(--color-gold) / <alpha-value>)",
+          light: "rgb(var(--color-gold-light) / <alpha-value>)",
+          dark: "rgb(var(--color-gold-dark) / <alpha-value>)",
         },
-        ivory: "#FBF6EE",
+        ivory: "rgb(var(--color-ivory) / <alpha-value>)",
         ink: "#2A1E1B",
         emerald: {
           DEFAULT: "#1F4032",
           light: "#2E5A46",
         },
-        blush: "#F4E3D7",
+        blush: "rgb(var(--color-blush) / <alpha-value>)",
+        rose: {
+          DEFAULT: "rgb(var(--color-rose) / <alpha-value>)",
+          light: "rgb(var(--color-rose-light) / <alpha-value>)",
+          dark: "rgb(var(--color-rose-dark) / <alpha-value>)",
+        },
       },
       fontFamily: {
         display: ["Marcellus", "serif"],
@@ -32,6 +37,7 @@ export default {
       },
       boxShadow: {
         card: "0 4px 24px -8px rgba(42, 30, 27, 0.18)",
+        lift: "0 12px 32px -8px rgba(110, 20, 35, 0.28)",
       },
     },
   },

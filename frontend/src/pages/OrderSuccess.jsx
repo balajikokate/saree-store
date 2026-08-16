@@ -76,6 +76,14 @@ export default function OrderSuccess() {
       <Link to="/shop" className="btn-primary mt-8 inline-flex">
         Continue Shopping
       </Link>
+      {(order.status === "PAID" || order.status === "SHIPPED" || order.status === "DELIVERED") && (
+        <a
+          href={orderApi.invoiceUrl(order.orderNumber)}
+          className="btn-secondary mt-8 ml-3 inline-flex"
+        >
+          Download Invoice (PDF)
+        </a>
+      )}
     </div>
   );
 }

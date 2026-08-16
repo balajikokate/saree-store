@@ -12,11 +12,11 @@ export default function Button({
   ...rest
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-sm px-6 py-3 text-sm font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex items-center justify-center gap-2 rounded-sm px-6 py-3 text-sm font-semibold tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none disabled:hover:-translate-y-0";
 
   const variants = {
-    primary: "bg-maroon text-ivory hover:bg-maroon-dark",
-    secondary: "border border-maroon text-maroon hover:bg-maroon hover:text-ivory",
+    primary: "bg-maroon text-ivory hover:bg-maroon-dark hover:-translate-y-0.5 hover:shadow-lift",
+    secondary: "border border-maroon text-maroon hover:bg-maroon hover:text-ivory hover:-translate-y-0.5",
     ghost: "text-maroon hover:bg-blush",
   };
 

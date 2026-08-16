@@ -43,13 +43,13 @@ export default function AdminOrderDetail() {
         ← Back to orders
       </Link>
 
-      <div className="mt-4 flex items-center justify-between">
-        <h1 className="font-display text-3xl text-ink">{order.orderNumber}</h1>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="break-all font-display text-xl text-ink sm:text-3xl">{order.orderNumber}</h1>
         <select
           value={order.status}
           onChange={(e) => handleStatusChange(e.target.value)}
           disabled={updating}
-          className="input-field w-40"
+          className="input-field w-full sm:w-40"
         >
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -116,8 +116,8 @@ export default function AdminOrderDetail() {
 function Row({ label, value }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-ink/50">{label}</dt>
-      <dd className="font-medium text-ink">{value}</dd>
+      <dt className="flex-shrink-0 text-ink/50">{label}</dt>
+      <dd className="break-all text-right font-medium text-ink">{value}</dd>
     </div>
   );
 }

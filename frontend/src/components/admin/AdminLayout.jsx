@@ -7,6 +7,10 @@ const navItems = [
   { to: "/admin/products", label: "Products" },
   { to: "/admin/categories", label: "Categories" },
   { to: "/admin/orders", label: "Orders" },
+  { to: "/admin/coupons", label: "Coupons" },
+  { to: "/admin/reviews", label: "Reviews" },
+  { to: "/admin/wholesale", label: "Wholesale Inquiries" },
+  { to: "/admin/settings", label: "Settings" },
 ];
 
 export default function AdminLayout() {

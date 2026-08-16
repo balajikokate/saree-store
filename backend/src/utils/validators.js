@@ -20,6 +20,9 @@ const checkoutSchema = z.object({
       })
     )
     .min(1, "Cart is empty"),
+  couponCode: z.string().max(30).optional(),
+  giftWrap: z.boolean().optional(),
+  giftNote: z.string().max(300).optional(),
 });
 
 const verifyPaymentSchema = z.object({
@@ -99,6 +102,43 @@ const addressSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
+const reviewSchema = z.object({
+  rating: z.number().int().min(1, "Rating is required").max(5),
+  comment: z.string().min(5, "Please write a few words").max(1000),
+});
+
+const couponSchema = z.object({
+  code: z
+    .string()
+    .min(3, "Code is too short")
+    .max(30)
+    .regex(/^[A-Za-z0-9]+$/, "Use letters and numbers only"),
+  type: z.enum(["PERCENTAGE", "FIXED"]),
+  value: z.number().positive("Value must be greater than 0"),
+  minOrderValue: z.number().min(0).optional(),
+  maxDiscount: z.number().positive().nullable().optional(),
+  usageLimit: z.number().int().positive().nullable().optional(),
+  active: z.boolean().optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
+});
+
+const couponValidateSchema = z.object({
+  code: z.string().min(1, "Enter a coupon code"),
+  subtotal: z.number().nonnegative(),
+});
+
+const wholesaleInquirySchema = z.object({
+  name: z.string().min(2, "Enter your name").max(100),
+  businessName: z.string().max(150).optional().or(z.literal("")),
+  email: z.string().email("Enter a valid email"),
+  phone: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
+  message: z.string().min(10, "Tell us a bit more about what you're looking for").max(1000),
+});
+
+const settingsSchema = z.object({
+  theme: z.enum(["royal", "purple", "pink"]),
+});
+
 module.exports = {
   checkoutSchema,
   verifyPaymentSchema,
@@ -111,4 +151,9 @@ module.exports = {
   profileUpdateSchema,
   changePasswordSchema,
   addressSchema,
+  reviewSchema,
+  couponSchema,
+  couponValidateSchema,
+  wholesaleInquirySchema,
+  settingsSchema,
 };

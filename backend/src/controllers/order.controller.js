@@ -5,10 +5,12 @@ const asyncHandler = require("../utils/asyncHandler");
 const { ApiError } = require("../middleware/errorHandler");
 const { checkoutSchema, verifyPaymentSchema } = require("../utils/validators");
 const { markOrderPaid } = require("../services/orderFulfillment");
+const { evaluateCoupon } = require("../services/coupon");
+const { streamInvoicePdf } = require("../services/invoice");
 
 const SHIPPING_FLAT_FEE = 0; // free shipping storewide; change if needed
-
 const FREE_SHIPPING_THRESHOLD = 1999;
+const GIFT_WRAP_FEE = 49;
 
 // The order number doubles as a public "access key" — anyone who has it can
 // look up the order's name/address/phone with no login (this is what makes
@@ -36,7 +38,7 @@ const checkout = asyncHandler(async (req, res) => {
   if (!parsed.success) {
     throw new ApiError(400, "Invalid checkout data", parsed.error.flatten());
   }
-  const { customer, items } = parsed.data;
+  const { customer, items, couponCode, giftWrap, giftNote } = parsed.data;
 
   const productIds = items.map((i) => i.productId);
   const products = await prisma.product.findMany({
@@ -67,8 +69,20 @@ const checkout = asyncHandler(async (req, res) => {
     });
   }
 
+  // Coupon discount is validated server-side, same as prices — never trust
+  // a discount amount from the client, only ever the code itself.
+  let discountAmount = 0;
+  let appliedCouponCode = null;
+  if (couponCode) {
+    const result = await evaluateCoupon(couponCode, subtotal);
+    if (!result.valid) throw new ApiError(400, result.message);
+    discountAmount = result.discountAmount;
+    appliedCouponCode = result.coupon.code;
+  }
+
   const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FLAT_FEE || 49;
-  const totalAmount = subtotal + shippingFee;
+  const giftWrapFee = giftWrap ? GIFT_WRAP_FEE : 0;
+  const totalAmount = Math.max(subtotal + shippingFee + giftWrapFee - discountAmount, 0);
 
   // Create the order in our DB first (status PENDING)
   const order = await prisma.order.create({
@@ -84,6 +98,11 @@ const checkout = asyncHandler(async (req, res) => {
       pincode: customer.pincode,
       subtotal,
       shippingFee,
+      couponCode: appliedCouponCode,
+      discountAmount,
+      giftWrap: !!giftWrap,
+      giftWrapFee,
+      giftNote: giftWrap ? giftNote || null : null,
       totalAmount,
       items: { create: orderItemsData },
     },
@@ -168,4 +187,17 @@ const getOrderByNumber = asyncHandler(async (req, res) => {
   res.json({ success: true, data: order });
 });
 
-module.exports = { checkout, verifyPayment, getOrderByNumber };
+// GET /api/orders/:orderNumber/invoice — downloadable PDF invoice.
+// Same public access model as the order lookup above: the order number
+// itself is the access key (see the comment on generateOrderNumber for why
+// that's safe — it's cryptographically random, not guessable).
+const downloadInvoice = asyncHandler(async (req, res) => {
+  const order = await prisma.order.findUnique({
+    where: { orderNumber: req.params.orderNumber },
+    include: { items: true },
+  });
+  if (!order) throw new ApiError(404, "Order not found");
+  streamInvoicePdf(order, res);
+});
+
+module.exports = { checkout, verifyPayment, getOrderByNumber, downloadInvoice };

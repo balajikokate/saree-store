@@ -6,13 +6,16 @@ const SHIPPING_FEE = 49;
 
 /**
  * items (optional): [{ productId, name, image, price, quantity }]
+ * discountAmount / couponCode (optional): shown as a line item when a
+ * coupon has been applied.
+ * giftWrapFee (optional): shown as a line item when gift wrap is selected.
  * When provided, renders an itemized product list above the totals — used
  * on the Checkout page so the customer can see exactly what they're paying
  * for, whether that's their full cart or a single "Buy Now" item.
  */
-export default function CartSummary({ subtotal, items, children }) {
+export default function CartSummary({ subtotal, items, discountAmount = 0, couponCode, giftWrapFee = 0, children }) {
   const shippingFee = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_FEE;
-  const total = subtotal + shippingFee;
+  const total = Math.max(subtotal + shippingFee + giftWrapFee - discountAmount, 0);
 
   return (
     <div className="rounded-sm border border-ink/10 bg-white p-6 shadow-card">
@@ -55,6 +58,18 @@ export default function CartSummary({ subtotal, items, children }) {
           <dt>Shipping</dt>
           <dd>{shippingFee === 0 ? "Free" : formatINR(shippingFee)}</dd>
         </div>
+        {giftWrapFee > 0 && (
+          <div className="flex justify-between text-ink/70">
+            <dt>Gift wrap</dt>
+            <dd>{formatINR(giftWrapFee)}</dd>
+          </div>
+        )}
+        {discountAmount > 0 && (
+          <div className="flex justify-between text-emerald">
+            <dt>Discount{couponCode ? ` (${couponCode})` : ""}</dt>
+            <dd>-{formatINR(discountAmount)}</dd>
+          </div>
+        )}
         {shippingFee > 0 && (
           <p className="text-xs text-emerald">
             Add {formatINR(FREE_SHIPPING_THRESHOLD - subtotal)} more for free shipping

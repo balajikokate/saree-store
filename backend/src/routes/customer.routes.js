@@ -9,8 +9,12 @@ const {
   createAddress,
   updateAddress,
   deleteAddress,
+  listWishlist,
+  addToWishlist,
+  removeFromWishlist,
   listMyOrders,
   getMyOrder,
+  downloadMyInvoice,
 } = require("../controllers/account.controller");
 
 // Slow down signup/login abuse (credential stuffing, fake account spam)
@@ -38,7 +42,12 @@ router.post("/account/addresses", requireCustomer, createAddress);
 router.put("/account/addresses/:id", requireCustomer, updateAddress);
 router.delete("/account/addresses/:id", requireCustomer, deleteAddress);
 
+router.get("/account/wishlist", requireCustomer, listWishlist);
+router.post("/account/wishlist", requireCustomer, addToWishlist);
+router.delete("/account/wishlist/:productId", requireCustomer, removeFromWishlist);
+
 router.get("/account/orders", requireCustomer, listMyOrders);
 router.get("/account/orders/:orderNumber", requireCustomer, getMyOrder);
+router.get("/account/orders/:orderNumber/invoice", requireCustomer, downloadMyInvoice);
 
 module.exports = router;

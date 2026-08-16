@@ -59,10 +59,31 @@ export const adminOrderApi = {
   list: (params) => adminApi.get("/admin/orders", { params }),
   get: (id) => adminApi.get(`/admin/orders/${id}`),
   updateStatus: (id, status) => adminApi.patch(`/admin/orders/${id}/status`, { status }),
+  invoiceUrl: (id) => `${ASSET_BASE_URL}/api/admin/orders/${id}/invoice`,
 };
 
 export const adminStatsApi = {
   get: () => adminApi.get("/admin/stats"),
+};
+
+export const adminCouponApi = {
+  list: () => adminApi.get("/admin/coupons"),
+  create: (data) => adminApi.post("/admin/coupons", data),
+  update: (id, data) => adminApi.put(`/admin/coupons/${id}`, data),
+  remove: (id) => adminApi.delete(`/admin/coupons/${id}`),
+};
+
+export const adminReviewApi = {
+  list: () => adminApi.get("/admin/reviews"),
+  remove: (id) => adminApi.delete(`/admin/reviews/${id}`),
+};
+
+export const adminWholesaleApi = {
+  list: () => adminApi.get("/admin/wholesale-inquiries"),
+};
+
+export const adminSettingsApi = {
+  update: (theme) => adminApi.patch("/admin/settings", { theme }),
 };
 
 export { ASSET_BASE_URL };

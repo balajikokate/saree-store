@@ -55,6 +55,16 @@ async function markOrderPaid({ orderId, razorpayPaymentId, razorpaySignature }) 
       });
     }
 
+    // Coupon usage is only counted once the order actually gets paid (not
+    // at checkout time) — this same transaction guarantees it increments
+    // exactly once even under the webhook/browser race described above.
+    if (order.couponCode) {
+      await tx.coupon.updateMany({
+        where: { code: order.couponCode },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
     return order;
   });
 

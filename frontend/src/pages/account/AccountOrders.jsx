@@ -68,13 +68,23 @@ export default function AccountOrders() {
             ))}
           </ul>
 
-          <div className="mt-3 flex items-center justify-between border-t border-ink/10 pt-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink/10 pt-3">
             <span className="text-sm font-semibold text-ink">Total: {formatINR(order.totalAmount)}</span>
-            {order.status === "PAID" || order.status === "SHIPPED" || order.status === "DELIVERED" ? (
-              <Link to={`/order-success/${order.orderNumber}`} className="text-sm font-medium text-maroon underline">
-                View details
-              </Link>
-            ) : null}
+            <div className="flex items-center gap-3">
+              {(order.status === "PAID" || order.status === "SHIPPED" || order.status === "DELIVERED") && (
+                <>
+                  <a
+                    href={accountApi.orders.invoiceUrl(order.orderNumber)}
+                    className="text-sm font-medium text-maroon underline"
+                  >
+                    Invoice (PDF)
+                  </a>
+                  <Link to={`/order-success/${order.orderNumber}`} className="text-sm font-medium text-maroon underline">
+                    View details
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       ))}

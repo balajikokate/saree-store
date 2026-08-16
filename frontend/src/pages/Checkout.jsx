@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useCustomerAuth } from "../context/CustomerAuthContext";
-import { orderApi, accountApi } from "../services/api";
+import { orderApi, accountApi, couponApi } from "../services/api";
 import CartSummary from "../components/cart/CartSummary";
 import Button from "../components/common/Button";
 import EmptyState from "../components/common/EmptyState";
@@ -70,6 +70,15 @@ export default function Checkout() {
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
 
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discountAmount }
+  const [couponChecking, setCouponChecking] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
+  const [giftWrap, setGiftWrap] = useState(false);
+  const [giftNote, setGiftNote] = useState("");
+  const GIFT_WRAP_FEE = 49;
+
   // Prefill name/email for logged-in customers, and offer their saved
   // addresses so they don't have to retype anything.
   useEffect(() => {
@@ -97,6 +106,33 @@ export default function Checkout() {
       state: addr.state,
       pincode: addr.pincode,
     }));
+  };
+
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponError("");
+    setCouponChecking(true);
+    try {
+      const res = await couponApi.validate(code, subtotal);
+      if (!res.success) {
+        setCouponError(res.message || "This coupon isn't valid");
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon({ code: res.data.code, discountAmount: res.data.discountAmount });
+      }
+    } catch (err) {
+      setCouponError(err.message || "Failed to check coupon");
+      setAppliedCoupon(null);
+    } finally {
+      setCouponChecking(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
   };
 
   if (items.length === 0) {
@@ -146,6 +182,9 @@ export default function Checkout() {
       const checkoutRes = await orderApi.checkout({
         customer: form,
         items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        couponCode: appliedCoupon?.code,
+        giftWrap,
+        giftNote: giftWrap ? giftNote : undefined,
       });
 
       const { orderId, orderNumber, amount, currency, razorpayOrderId, razorpayKeyId } =
@@ -267,6 +306,56 @@ export default function Checkout() {
             <p className="rounded-sm bg-maroon/10 px-4 py-3 text-sm text-maroon">{serverError}</p>
           )}
 
+          <div className="rounded-sm border border-ink/10 p-4">
+            <label className="mb-1 block text-sm font-medium text-ink/80">Coupon code</label>
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between rounded-sm bg-emerald/10 px-3 py-2 text-sm text-emerald">
+                <span>
+                  <strong>{appliedCoupon.code}</strong> applied — you saved{" "}
+                  {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(appliedCoupon.discountAmount)}
+                </span>
+                <button type="button" onClick={handleRemoveCoupon} className="font-medium underline">
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  className="input-field flex-1"
+                />
+                <Button type="button" variant="secondary" onClick={handleApplyCoupon} isLoading={couponChecking}>
+                  Apply
+                </Button>
+              </div>
+            )}
+            {couponError && <p className="mt-1 text-xs text-maroon">{couponError}</p>}
+          </div>
+
+          <div className="rounded-sm border border-ink/10 p-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink/80">
+              <input
+                type="checkbox"
+                checked={giftWrap}
+                onChange={(e) => setGiftWrap(e.target.checked)}
+                className="h-4 w-4 accent-maroon"
+              />
+              Gift wrap this order (+₹{GIFT_WRAP_FEE})
+            </label>
+            {giftWrap && (
+              <textarea
+                value={giftNote}
+                onChange={(e) => setGiftNote(e.target.value)}
+                placeholder="Add a gift note (optional)"
+                rows={2}
+                maxLength={300}
+                className="input-field mt-3"
+              />
+            )}
+          </div>
+
           <Button type="submit" isLoading={submitting} className="w-full sm:w-auto">
             Pay with Razorpay
           </Button>
@@ -275,7 +364,13 @@ export default function Checkout() {
           </p>
         </form>
 
-        <CartSummary subtotal={subtotal} items={items} />
+        <CartSummary
+          subtotal={subtotal}
+          items={items}
+          discountAmount={appliedCoupon?.discountAmount || 0}
+          couponCode={appliedCoupon?.code}
+          giftWrapFee={giftWrap ? GIFT_WRAP_FEE : 0}
+        />
       </div>
     </div>
   );

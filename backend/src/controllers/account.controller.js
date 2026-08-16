@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const prisma = require("../lib/prisma");
 const asyncHandler = require("../utils/asyncHandler");
 const { ApiError } = require("../middleware/errorHandler");
+const { streamInvoicePdf } = require("../services/invoice");
 const {
   profileUpdateSchema,
   changePasswordSchema,
@@ -115,6 +116,44 @@ const deleteAddress = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { id: existing.id } });
 });
 
+// -------------------- Wishlist (synced across devices for logged-in customers) --------------------
+
+// GET /api/account/wishlist
+const listWishlist = asyncHandler(async (req, res) => {
+  const items = await prisma.wishlistItem.findMany({
+    where: { userId: req.user.sub },
+    orderBy: { createdAt: "desc" },
+    include: { product: true },
+  });
+  res.json({ success: true, data: items.map((i) => i.product) });
+});
+
+// POST /api/account/wishlist  { productId }
+const addToWishlist = asyncHandler(async (req, res) => {
+  const { productId } = req.body || {};
+  if (!productId) throw new ApiError(400, "productId is required");
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) throw new ApiError(404, "Product not found");
+
+  await prisma.wishlistItem.upsert({
+    where: { userId_productId: { userId: req.user.sub, productId } },
+    update: {},
+    create: { userId: req.user.sub, productId },
+  });
+  res.status(201).json({ success: true });
+});
+
+// DELETE /api/account/wishlist/:productId
+const removeFromWishlist = asyncHandler(async (req, res) => {
+  await prisma.wishlistItem
+    .delete({
+      where: { userId_productId: { userId: req.user.sub, productId: req.params.productId } },
+    })
+    .catch(() => {}); // already removed — treat as success either way
+  res.json({ success: true });
+});
+
 // -------------------- Order history --------------------
 
 // GET /api/account/orders
@@ -137,6 +176,16 @@ const getMyOrder = asyncHandler(async (req, res) => {
   res.json({ success: true, data: order });
 });
 
+// GET /api/account/orders/:orderNumber/invoice
+const downloadMyInvoice = asyncHandler(async (req, res) => {
+  const order = await prisma.order.findUnique({
+    where: { orderNumber: req.params.orderNumber },
+    include: { items: true },
+  });
+  if (!order || order.userId !== req.user.sub) throw new ApiError(404, "Order not found");
+  streamInvoicePdf(order, res);
+});
+
 module.exports = {
   updateProfile,
   changePassword,
@@ -144,6 +193,10 @@ module.exports = {
   createAddress,
   updateAddress,
   deleteAddress,
+  listWishlist,
+  addToWishlist,
+  removeFromWishlist,
   listMyOrders,
   getMyOrder,
+  downloadMyInvoice,
 };

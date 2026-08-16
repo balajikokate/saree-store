@@ -15,8 +15,13 @@ const {
   listOrders,
   getOrderById,
   updateOrderStatus,
+  downloadOrderInvoice,
   getDashboardStats,
 } = require("../controllers/admin.controller");
+const { listCoupons, createCoupon, updateCoupon, deleteCoupon } = require("../controllers/coupon.controller");
+const { listAllReviews, deleteReview } = require("../controllers/review.controller");
+const { listInquiries } = require("../controllers/wholesale.controller");
+const { updateSettings } = require("../controllers/settings.controller");
 
 // Slow down brute-force login attempts
 const loginLimiter = rateLimit({
@@ -50,5 +55,18 @@ router.post("/admin/upload-image", upload.single("image"), uploadImage);
 router.get("/admin/orders", listOrders);
 router.get("/admin/orders/:id", getOrderById);
 router.patch("/admin/orders/:id/status", updateOrderStatus);
+router.get("/admin/orders/:id/invoice", downloadOrderInvoice);
+
+router.get("/admin/coupons", listCoupons);
+router.post("/admin/coupons", createCoupon);
+router.put("/admin/coupons/:id", updateCoupon);
+router.delete("/admin/coupons/:id", deleteCoupon);
+
+router.get("/admin/reviews", listAllReviews);
+router.delete("/admin/reviews/:id", deleteReview);
+
+router.get("/admin/wholesale-inquiries", listInquiries);
+
+router.patch("/admin/settings", updateSettings);
 
 module.exports = router;

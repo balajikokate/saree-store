@@ -2,6 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme system: each preset defines the same set of CSS variables as
+ * space-separated RGB triplets (required for Tailwind's
+ * `rgb(var(--x) / <alpha-value>)` pattern, which is what lets opacity
+ * modifiers like `bg-maroon/95` keep working with a runtime-swappable
+ * color). Switching themes is just changing `data-theme` on <html> — see
+ * ThemeContext.jsx — no rebuild needed, so the admin can change this from
+ * a dropdown and it applies immediately for every visitor.
+ *
+ * "royal" (maroon & gold) is the default/original theme and matches what
+ * :root defines with no data-theme attribute at all, so anything that
+ * somehow renders before the theme loads still looks correct rather than
+ * unstyled.
+ */
+:root,
+[data-theme="royal"] {
+  --color-maroon: 110 20 35; /* #6E1423 */
+  --color-maroon-dark: 74 13 24; /* #4A0D18 */
+  --color-maroon-light: 140 34 51; /* #8C2233 */
+  --color-gold: 200 155 60; /* #C89B3C */
+  --color-gold-light: 228 199 122; /* #E4C77A */
+  --color-gold-dark: 156 117 38; /* #9C7526 */
+  --color-blush: 244 227 215; /* #F4E3D7 */
+  --color-ivory: 251 246 238; /* #FBF6EE */
+  --color-rose: 183 110 121; /* #B76E79 */
+  --color-rose-light: 217 154 163; /* #D99AA3 */
+  --color-rose-dark: 142 75 86; /* #8E4B56 */
+}
+
+[data-theme="purple"] {
+  --color-maroon: 91 42 134; /* #5B2A86 deep amethyst purple */
+  --color-maroon-dark: 62 29 92; /* #3E1D5C */
+  --color-maroon-light: 130 76 176; /* #824CB0 */
+  --color-gold: 176 139 201; /* #B08BC9 soft lilac accent, replaces gold */
+  --color-gold-light: 214 191 230; /* #D6BFE6 */
+  --color-gold-dark: 138 98 168; /* #8A62A8 */
+  --color-blush: 240 232 247; /* #F0E8F7 pale lavender */
+  --color-ivory: 253 251 255; /* #FDFBFF near-white with a violet whisper */
+  --color-rose: 199 130 158; /* #C7829E */
+  --color-rose-light: 224 179 197;
+  --color-rose-dark: 156 92 118;
+}
+
+[data-theme="pink"] {
+  --color-maroon: 194 24 91; /* #C2185B rich rose-pink, replaces maroon as the primary */
+  --color-maroon-dark: 154 15 68; /* #9A0F44 */
+  --color-maroon-light: 219 90 140; /* #DB5A8C */
+  --color-gold: 240 176 200; /* #F0B0C8 soft pink accent, replaces gold */
+  --color-gold-light: 250 214 227;
+  --color-gold-dark: 214 140 168;
+  --color-blush: 253 235 240; /* #FDEBF0 */
+  --color-ivory: 255 250 251; /* #FFFAFB */
+  --color-rose: 214 100 140;
+  --color-rose-light: 235 160 185;
+  --color-rose-dark: 176 70 105;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -16,7 +73,7 @@
     @apply font-display;
   }
   :focus-visible {
-    outline: 2px solid #c89b3c;
+    outline: 2px solid rgb(var(--color-gold));
     outline-offset: 2px;
   }
 }
@@ -28,8 +85,8 @@
     height: 6px;
     background-image: repeating-linear-gradient(
       135deg,
-      #c89b3c 0,
-      #c89b3c 3px,
+      rgb(var(--color-gold)) 0,
+      rgb(var(--color-gold)) 3px,
       transparent 3px,
       transparent 9px
     );
@@ -59,3 +116,4 @@
     transition-duration: 0.01ms !important;
   }
 }
+

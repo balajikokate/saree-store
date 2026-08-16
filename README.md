@@ -224,7 +224,13 @@ The homepage hero now plays a short looping video instead of a static image (it 
 - **Product pages** show a sticky Add to Cart / Buy Now bar on mobile so it's always reachable while scrolling
 - **"You may also like"** related products now appear at the bottom of each product page (same category, excluding the current item)
 
-## 9. Customer Accounts
+## 9. Wishlist & Search
+
+**Wishlist** — tap the heart icon on any product card or product page to save it. Saved items live at `/wishlist`, with a "Move to cart" or "Remove" option on each. This is stored in the browser (like the cart), not tied to an account — works immediately for anyone, no login required. (A natural upgrade later: sync wishlist to the account for logged-in customers so it follows them across devices — ask if you want that built.)
+
+**Search** — a search bar in the navbar (desktop: always visible; mobile: tap the magnifying glass) searches product name, description, and fabric, and takes you to `/shop?search=...` with results. Works alongside category/fabric/occasion filters — search for "silk" and then narrow by category, for example.
+
+## 10. Customer Accounts
 
 Customers can now create an account, save addresses, and view order history — while guest checkout (no account needed) still works exactly as before.
 
@@ -244,7 +250,25 @@ cd backend
 npx prisma migrate dev --name add_user_accounts
 ```
 
-## 10. Security Hardening (Admin & Customer Sessions)
+## 11. Reviews, Coupons, PDF Invoices, Gift Wrap, Wholesale & Custom Theme
+
+A large batch of features, all fully working end to end:
+
+**Product reviews & ratings** — logged-in customers can rate/review any product from its page; "Verified purchase" is computed server-side (checked against real paid orders, can't be faked). Average rating recalculates automatically. Moderate reviews at **Admin → Reviews**.
+
+**Coupon codes** — create percentage or fixed-amount codes at **Admin → Coupons**, with optional minimum order value, max discount cap, usage limits, and expiry. Customers enter a code at checkout; the discount shown there is computed by the exact same server logic checkout itself enforces, so what they see always matches what they're charged — a client can never submit a fake discount amount.
+
+**PDF Invoices** — every paid order gets a downloadable PDF invoice (branded, itemized, includes any discount/gift-wrap line items). Available from the order confirmation page, **My Account → Orders**, and **Admin → Orders**.
+
+**Gift wrap** — a checkbox at checkout (+₹49) with an optional gift note, shown on the invoice and to admin — useful since sarees are commonly gifted.
+
+**Wholesale/bulk inquiries** — a form at `/wholesale` (linked in the footer) for boutiques/resellers to reach out; submissions email you and are listed at **Admin → Wholesale Inquiries**.
+
+**Customizable theme** — go to **Admin → Settings** to switch the entire site's color palette between three presets: **Royal** (maroon & gold, the original), **Purple & White**, and **Pink & White**. Changes preview live as you click, and "Save" makes it permanent for every visitor — no code change or redeploy needed. Under the hood this uses CSS custom properties rather than hardcoded colors, so it's a real runtime switch.
+
+**Wishlist now syncs to accounts** — previously browser-only; a logged-in customer's wishlist now follows them across devices (guest wishlist items are automatically merged in on login).
+
+## 12. Security Hardening (Admin & Customer Sessions)
 
 Three meaningful upgrades over the original implementation, all now in place:
 
@@ -263,7 +287,7 @@ Both admin and customer logins now lock out after 5 failed attempts within 15 mi
 - Customer-entered checkout fields (name, address) are now HTML-escaped before being embedded in notification emails — previously a malicious "customer" could have injected raw HTML/scripts into the emails sent to you.
 - Order numbers (used as a public "receipt lookup" key for guest order confirmation, no login required) now use a cryptographically random 8-character suffix instead of a guessable 4-digit one — makes enumerating other customers' order details impractical.
 
-## 11. Performance — read this before running Lighthouse
+## 13. Performance — read this before running Lighthouse
 
 **If you got a low Lighthouse score (e.g. ~30), you almost certainly tested `http://localhost:5173` while `npm run dev` was running.** Vite's dev server is intentionally unminified, unbundled per-module, and keeps a live-reload WebSocket open — it is *never* representative of real-world performance. Always test the **production build**:
 
@@ -287,13 +311,13 @@ Then run Lighthouse against the URL `npm run preview` gives you (usually `http:/
 
 The placeholder images this project ships with (`backend/scripts/generate-placeholder-images.js` output) are deliberately kept in that same 20–30KB range as a size target to match.
 
-## 12. Fixed: Razorpay scripts running after payment
+## 14. Fixed: Razorpay scripts running after payment
 
 Previously, after a successful payment the app used client-side routing (`navigate()`) to move to the order confirmation page. Razorpay's checkout SDK injects iframes and background listeners into the page for fraud detection — since a single-page app never actually reloads the document on a route change, those kept running indefinitely, even after navigating elsewhere.
 
 **Fix applied:** on successful payment, the app now calls `rzp.close()` and then does a **full browser navigation** (`window.location.href`) to the order confirmation page instead of a client-side route change. This guarantees the browser tears down everything Razorpay injected, exactly like closing and reopening a tab would. You shouldn't see any lingering network activity in DevTools after this.
 
-## 13. Adding your own saree photos
+## 15. Adding your own saree photos
 
 Product images live under `backend/public/images/products/<category-slug>/` and are served automatically by the backend at `/images/products/...` — no code changes needed.
 
@@ -314,15 +338,16 @@ Out of the box, `backend/scripts/generate-placeholder-images.js` fills these fol
 
 **When deploying:** Render's free tier has an ephemeral filesystem — files you upload directly on the server can disappear on redeploy. For production, either commit your image files to the repo (fine for a modest catalog) or move to a proper image host like Cloudinary/ImageKit/S3 and store full URLs in the `images` array instead of local paths (the frontend already supports both — see `frontend/src/utils/image.js`).
 
-## 14. Extending this later
+## 16. Extending this later
 
 Some natural next additions — say the word and I'll build any of these:
-- **Product reviews**, wishlist
-- **Coupons/discounts**, abandoned cart email reminders
+- **Abandoned cart email reminders**
 - **Multiple admin/staff logins** with roles, if one shared login stops being enough
 - **Cloud image storage** (Cloudinary/S3) so uploaded photos survive redeploys on free hosting tiers
 - **Password reset via email** ("forgot password" flow) — not yet built for either admin or customer accounts; currently a forgotten password requires manually resetting via `scripts/hash-password.js` (admin) or direct DB access (customer)
 
-## 15. Notes on the sample data
+**Before you launch:** `frontend/src/components/layout/Footer.jsx` has placeholder Instagram/WhatsApp links (`SOCIAL_LINKS` near the top of the file) — swap in your real handles/number.
+
+## 17. Notes on the sample data
 
 `backend/prisma/seed.js` ships with simple generated placeholder images (see Section 3 above). Replace them with your real product photography before launch — ideally hosted on a CDN/image service (Cloudinary, ImageKit, or S3 + CloudFront) rather than committed to your repo, once your catalog grows.
